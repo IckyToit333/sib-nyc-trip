@@ -333,7 +333,10 @@ $('#sheetBody').addEventListener('click', (e) => {
   else if (act === 'add-after') { const hit = STOP_BY_ID.get(id); ensureWho(() => openAdd({ day: hit.day.id, after: id })); }
   else if (act === 'remove-added') {
     const hit = STOP_BY_ID.get(id);
-    if (hit && confirm(`Remove “${hit.stop.name}” from the plan for everyone?`)) { sync.deleteStop(id); ui.sel = null; toast('Stop removed.'); }
+    if (hit && confirm(`Remove “${hit.stop.name}” from the plan for everyone?`)) {
+      ui.sel = null; history.replaceState(null, '', '#' + ui.dayId);
+      sync.deleteStop(id); toast('Stop removed.');
+    }
   }
 });
 $('#sheetBody').addEventListener('keydown', (e) => {
@@ -567,7 +570,7 @@ function lastStopId(dayId) {
 const draft = { day: null, after: null, name: '', at: null, q: null, t: '', cost: '', kind: 'sight', note: '', results: [], searching: false, searchMsg: '' };
 
 function openAdd({ day, after }) {
-  Object.assign(draft, { day, after, name: '', at: null, q: null, t: '', cost: '', kind: 'sight', note: '', results: [], searching: false, searchMsg: '' });
+  Object.assign(draft, { day, after, name: '', at: null, q: null, t: '', cost: '', kind: 'sight', note: '', results: [], searching: false, searchMsg: '', searchText: '' });
   renderAdd();
   openPanel('#add');
   setTimeout(() => $('#addSearch')?.focus(), 150);
@@ -665,30 +668,29 @@ $('#add').addEventListener('submit', async (e) => {
 });
 
 // Pick a spot: move the map under a fixed crosshair, then confirm.
-function pickCentre() {
-  const top = $('.top').getBoundingClientRect().bottom;
-  const sheetTop = isWide() ? window.innerHeight : $('#sheet').getBoundingClientRect().top;
-  const mapBox = $('#map').getBoundingClientRect();
-  return { x: (isWide() ? mapBox.left + mapBox.width / 2 : window.innerWidth / 2) - mapBox.left, y: (top + sheetTop) / 2 - mapBox.top, top: (top + sheetTop) / 2 };
-}
+// The crosshair sits midway between the top bar and the pick bar; the spot saved is exactly under it.
+let pickPt = null;
 function startPick() {
   if (!tripMap || !ui.mapReady) { toast('The map isn’t ready yet.'); return; }
   closePanels();
   if (!isWide()) setSheet('peek', false);
-  const c = pickCentre();
-  const cross = $('#crosshair');
-  cross.style.top = c.top + 'px';
-  cross.style.left = (isWide() ? $('#map').getBoundingClientRect().left + c.x : window.innerWidth / 2) + 'px';
-  cross.hidden = false;
   $('#pickBar').hidden = false;
+  const topBottom = $('.top').getBoundingClientRect().bottom;
+  const barTop = $('#pickBar').getBoundingClientRect().top;
+  const mapBox = $('#map').getBoundingClientRect();
+  const x = mapBox.left + mapBox.width / 2;
+  const y = isWide() ? mapBox.top + mapBox.height / 2 : (topBottom + barTop) / 2;
+  pickPt = { x: x - mapBox.left, y: y - mapBox.top };
+  const cross = $('#crosshair');
+  cross.style.left = x + 'px'; cross.style.top = y + 'px';
+  cross.hidden = false;
 }
 function endPick() { $('#crosshair').hidden = true; $('#pickBar').hidden = true; setSheet('half', false); }
 $('#pickBar').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-pickbar]');
   if (!b) return;
   if (b.dataset.pickbar === 'cancel') { endPick(); openPanel('#add'); return; }
-  const c = pickCentre();
-  const at = tripMap.pointAt(c.x, c.y);
+  const at = tripMap.pointAt(pickPt.x, pickPt.y);
   endPick();
   Object.assign(draft, { at, q: null });
   renderAdd(); openPanel('#add');

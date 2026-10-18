@@ -9,7 +9,12 @@ export async function searchPlaces(text, near) {
   const res = await fetch('https://photon.komoot.io/api/?' + p.toString());
   if (!res.ok) throw new Error('Search failed');
   const json = await res.json();
-  return (json.features || []).map((f) => placeFrom(f)).filter((x) => x.name);
+  const seen = new Set();
+  return (json.features || []).map((f) => placeFrom(f)).filter((x) => {
+    const k = (x.name + '|' + x.sub).toLowerCase();
+    if (!x.name || seen.has(k)) return false;
+    seen.add(k); return true;
+  });
 }
 
 export async function nameForSpot(at) {
