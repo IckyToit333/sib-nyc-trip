@@ -305,6 +305,7 @@ function layoutSheet(refit = true) {
   document.documentElement.style.setProperty('--top-h', (top.offsetHeight - pt) + 'px');
   if (isWide()) {
     document.documentElement.style.setProperty('--sheet-visible', '0px');
+    sheetEl.style.setProperty('--sheet-y', '0px');
     tripMap && tripMap.setPadding({ top: 40, bottom: 40, left: 40, right: 60 });
     return;
   }

@@ -141,7 +141,7 @@ svg { display: block; }
 .sheet-grip { flex: none; height: 22px; display: grid; place-items: center; cursor: grab; }
 .sheet-grip span { width: 40px; height: 5px; border-radius: 5px; background: #D3CCBF; }
 .sheet-head { flex: none; padding: 0 16px 10px; cursor: grab; }
-.sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px calc(24px + var(--safe-b)); touch-action: pan-y; overscroll-behavior: contain; }
+.sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 12px calc(24px + var(--safe-b) + var(--sheet-y, 0px)); touch-action: pan-y; overscroll-behavior: contain; }
 
 .dh-date { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--day); display: flex; align-items: center; gap: 8px; }
 .dh-date .count { margin-left: auto; color: var(--muted); letter-spacing: 0; text-transform: none; font-weight: 600; }
@@ -270,6 +270,7 @@ svg { display: block; }
     transform: none !important; border-radius: 0; box-shadow: none; border-right: 1px solid var(--line);
   }
   .sheet-grip { display: none; }
+  .sheet-body { padding-bottom: calc(24px + var(--safe-b)); }
   .sheet-head { padding-top: 14px; cursor: default; }
   .stage { left: var(--panel-w); }
   .fabs { bottom: 30px; }
