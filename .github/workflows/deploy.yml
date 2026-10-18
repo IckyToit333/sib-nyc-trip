@@ -1,0 +1,105 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install libraries
+        run: npm install --no-audit --no-fund
+
+      - name: Bundle libraries (map, offline tiles, Firebase)
+        run: npm run build:libs
+
+      - name: Map fonts and icons
+        run: |
+          git clone --depth 1 https://github.com/protomaps/basemaps-assets /tmp/assets
+          mkdir -p site/vendor/fonts site/vendor/sprites
+          for f in "Noto Sans Regular" "Noto Sans Medium" "Noto Sans Italic"; do cp -r "/tmp/assets/fonts/$f" site/vendor/fonts/; done
+          cp -r /tmp/assets/sprites/v4 site/vendor/sprites/
+          du -sh site/vendor
+
+      - name: Restore offline map
+        id: mapcache
+        uses: actions/cache@v4
+        with:
+          path: site/map
+          key: nyc-map-${{ hashFiles('map/region.geojson') }}-v1
+
+      - name: Extract offline map (Manhattan, Brooklyn, Flushing, Ossining)
+        if: steps.mapcache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p /tmp/pm site/map
+          gh release download --repo protomaps/go-pmtiles --pattern '*Linux_x86_64.tar.gz' -D /tmp/pm
+          tar -xzf /tmp/pm/*.tar.gz -C /tmp/pm
+          BUILD=""
+          for i in $(seq 0 30); do
+            d=$(date -u -d "-$i day" +%Y%m%d)
+            if curl -sfI "https://build.protomaps.com/$d.pmtiles" > /dev/null; then BUILD=$d; break; fi
+          done
+          echo "Using Protomaps build: $BUILD"
+          test -n "$BUILD"
+          /tmp/pm/pmtiles extract "https://build.protomaps.com/$BUILD.pmtiles" site/map/nyc.pmtiles \
+            --region=map/region.geojson --maxzoom=15 --download-threads=8
+          echo "$BUILD" > site/map/BUILD
+          ls -la site/map
+
+      - name: Version stamp
+        run: |
+          SHA=${GITHUB_SHA::7}
+          BYTES=$(stat -c %s site/map/nyc.pmtiles)
+          MAPV=$(cat site/map/BUILD 2>/dev/null || echo unknown)
+          echo "{\"build\":\"$(date -u +%Y-%m-%d)-$SHA\",\"mapBytes\":$BYTES,\"mapVersion\":\"$MAPV\"}" > site/version.json
+          sed -i "s/__BUILD__/$SHA/" site/sw.js
+          cat site/version.json
+
+      - name: PDF backup
+        continue-on-error: true
+        run: |
+          npx playwright install --with-deps chromium
+          node scripts/make-pdf.mjs
+
+      - name: Keep a copy of the PDF
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-backup
+          path: site/sib-nyc-trip-backup.pdf
+          if-no-files-found: ignore
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

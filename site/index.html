@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Sib NYC Trip</title>
+  <meta name="theme-color" content="#14213D">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="NYC Trip">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="topbar">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">✶</span><span class="brand-name">NYC</span><span class="brand-sub">Dec 2026</span></div>
+        <button id="syncPill" class="pill" type="button" aria-live="polite"><i></i><span>Starting…</span></button>
+        <button id="menuBtn" class="icon-btn" type="button" aria-label="Menu"></button>
+      </div>
+      <nav id="dayTabs" class="days" aria-label="Days"></nav>
+    </header>
+
+    <main class="stage">
+      <div id="map" aria-label="Map"></div>
+      <div id="mapNotice" class="map-notice" hidden></div>
+      <div class="fabs">
+        <button id="fitBtn" class="fab" type="button" aria-label="Show the whole day"></button>
+      </div>
+    </main>
+
+    <section id="sheet" class="sheet" aria-label="Stops">
+      <div id="sheetGrip" class="sheet-grip"><span></span></div>
+      <div id="sheetHead" class="sheet-head"></div>
+      <div id="sheetBody" class="sheet-body"></div>
+    </section>
+
+    <div id="scrim" class="scrim" hidden></div>
+    <section id="menu" class="panel" role="dialog" aria-modal="true" aria-label="Menu" hidden></section>
+    <section id="who" class="panel panel-center" role="dialog" aria-modal="true" aria-label="Who are you" hidden></section>
+    <div id="toast" class="toast" role="status" hidden></div>
+  </div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Manhattan, west Brooklyn, Long Island City" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-74.05, 40.685], [-73.935, 40.685], [-73.935, 40.80], [-74.05, 40.80], [-74.05, 40.685]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Flushing" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-73.845, 40.750], [-73.820, 40.750], [-73.820, 40.766], [-73.845, 40.766], [-73.845, 40.750]]] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Ossining" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-73.885, 41.145], [-73.845, 41.145], [-73.845, 41.175], [-73.885, 41.175], [-73.885, 41.145]]] }
+    }
+  ]
+}

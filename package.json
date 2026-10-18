@@ -1,0 +1,17 @@
+{
+  "name": "sib-nyc-trip",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:libs": "esbuild src/libs.js --bundle --format=esm --minify --target=es2020 --outfile=site/vendor/libs.js && cp node_modules/maplibre-gl/dist/maplibre-gl.css site/vendor/maplibre-gl.css",
+    "pdf": "node scripts/make-pdf.mjs"
+  },
+  "devDependencies": {
+    "@protomaps/basemaps": ">=4.0.0 <7",
+    "esbuild": "^0.24.0",
+    "firebase": "^11.0.0",
+    "maplibre-gl": ">=4.7.1 <6",
+    "playwright": "^1.48.0",
+    "pmtiles": ">=3.2.0 <5"
+  }
+}
