@@ -252,7 +252,7 @@ def subway_path(a, b, lines, subway_lines, stations):
     for i in range(len(hubs)):
         for j in range(i + 1, len(hubs)):
             dd = dist(hubs[i][1]['at'], hubs[j][1]['at'])
-            if dd < 260:
+            if dd < 420:
                 g.add(hubs[i][0], hubs[j][0], 120 + dd * 2)
     if not hubs:
         return None

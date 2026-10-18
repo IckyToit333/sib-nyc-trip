@@ -23,8 +23,9 @@ const OPTIONAL = [
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(APP_CACHE);
-    await cache.addAll(CORE);
-    await Promise.all(OPTIONAL.map((u) => cache.add(u).catch(() => {})));
+    const fresh = (u) => new Request(u, { cache: 'reload' });
+    await cache.addAll(CORE.map(fresh));
+    await Promise.all(OPTIONAL.map((u) => cache.add(fresh(u)).catch(() => {})));
     await self.skipWaiting();
   })());
 });
@@ -45,7 +46,7 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.endsWith('.pmtiles') || req.headers.has('range')) return; // map file: handled by the app
   if (url.pathname.endsWith('.pdf')) return;
 
-  if (url.pathname.endsWith('version.json')) {
+  if (url.pathname.endsWith('version.json') || url.pathname.endsWith('geo.json')) {
     event.respondWith(fetch(req).then((res) => { const c = res.clone(); caches.open(APP_CACHE).then((x) => x.put(req, c)); return res; }).catch(() => caches.match(req)));
     return;
   }
