@@ -3,6 +3,7 @@ import { maplibregl, PMTiles, FileSource } from '../vendor/libs.js';
 import { TRIP, DAYS, LINE_COLORS } from './data.js';
 import { makeStyle, protocol, MAP_URL } from './map.js';
 import { applyGeo } from './geo.js';
+import { effectiveLegs } from './routes.js';
 import { dayDistances, fmtKm } from './stats.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -18,18 +19,14 @@ async function loadSource() {
 function features() {
   const legs = []; const pts = [];
   for (const d of DAYS) {
-    let prev = null; let n = 0;
+    for (const l of effectiveLegs(d, {})) {
+      legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, walk: l.mode === 'walk' }, geometry: { type: 'LineString', coordinates: l.path } });
+    }
+    let n = 0;
     for (const s of d.stops) {
       const hub = s.kind === 'hub';
       if (!hub) n++;
       if (!s.at) continue;
-      const mode = s.via?.m || 'walk';
-      if (s.path && mode !== 'train') {
-        legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, walk: mode === 'walk' }, geometry: { type: 'LineString', coordinates: s.path } });
-      } else if (prev && mode !== 'train' && !(prev[0] === s.at[0] && prev[1] === s.at[1])) {
-        legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, walk: mode === 'walk' }, geometry: { type: 'LineString', coordinates: [prev, s.at] } });
-      }
-      prev = s.at;
       pts.push({ type: 'Feature', properties: { day: d.id, color: d.color, label: hub ? '' : String(n), hub }, geometry: { type: 'Point', coordinates: s.at } });
     }
   }

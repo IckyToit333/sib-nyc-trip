@@ -1,5 +1,6 @@
 // Distance per day, split by how you get there. Uses the routed street/track paths when available.
 import { TRIP } from './data.js';
+import { effectiveLegs } from './routes.js';
 
 const R = 6371;
 function km(a, b) {
@@ -9,19 +10,13 @@ function km(a, b) {
 }
 const lineKm = (pts) => pts.slice(1).reduce((t, p, i) => t + km(pts[i], p), 0);
 
-export function dayDistances(day) {
+export function dayDistances(day, status = {}) {
   const out = { walk: 0, subway: 0, ferry: 0, rail: (day.mn || 0) * TRIP.metroNorthKm };
-  let prev = null;
-  for (const s of day.stops) {
-    if (!s.at) continue;
-    const mode = s.via?.m || 'walk';
-    if (mode !== 'train') {
-      const d = s.path ? lineKm(s.path) : prev ? km(prev, s.at) : 0;
-      if (mode === 'walk') out.walk += d;
-      else if (mode === 'ferry') out.ferry += d;
-      else out.subway += d;
-    }
-    prev = s.at;
+  for (const l of effectiveLegs(day, status)) {
+    const d = lineKm(l.path);
+    if (l.mode === 'walk') out.walk += d;
+    else if (l.mode === 'ferry') out.ferry += d;
+    else out.subway += d;
   }
   out.steps = Math.round((out.walk * 1320) / 500) * 500; // ~0.76 m per step
   return out;

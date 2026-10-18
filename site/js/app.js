@@ -170,7 +170,7 @@ function renderSheet(scrollToSel = true) {
     const sum = { walk: 0, subway: 0, ferry: 0, rail: 0, steps: 0 };
     DAYS.forEach((d) => {
       const p = dayProgress(d); done += p.done; total += p.total;
-      const x = dayDistances(d); for (const k of Object.keys(sum)) sum[k] += x[k];
+      const x = dayDistances(d, ui.shared.status); for (const k of Object.keys(sum)) sum[k] += x[k];
     });
     head.innerHTML = `<div class="dh-date">23 Dec – 1 Jan<span class="count">${done} of ${total} done</span></div>
       <h2 class="dh-title">The whole trip</h2><div class="dh-prog"><b style="width:${total ? (done / total) * 100 : 0}%"></b></div>`;
@@ -178,7 +178,7 @@ function renderSheet(scrollToSel = true) {
       const p = dayProgress(d);
       return `<button class="day-card" style="--c:${d.color}" data-act="day" data-id="${d.id}"><span class="sw"></span>
         <span><div class="dc-date">${d.dow} ${d.num}${d.date === TODAY ? ' · Today' : ''}</div><div class="dc-title">${esc(d.title)}</div>
-        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${fmtKm(dayDistances(d).walk)} walking · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
+        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${fmtKm(dayDistances(d, ui.shared.status).walk)} walking · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
     }).join('');
   } else {
     const d = DAYS.find((x) => x.id === ui.dayId);
@@ -191,7 +191,7 @@ function renderSheet(scrollToSel = true) {
     } else {
       const nextId = d.date === TODAY ? d.stops.find((s) => s.kind !== 'hub' && !statusOf(s.id))?.id : null;
       const meta = `<div class="day-meta">
-        ${statsHTML(dayDistances(d))}
+        ${statsHTML(dayDistances(d, ui.shared.status))}
         <div class="row">${ICONS.clock}<span>${esc(d.start)}</span></div>
         ${d.end ? `<div class="row">${ICONS.flagEnd}<span>${esc(d.end)}</span></div>` : ''}
         ${d.tips?.length ? `<ul>${d.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}

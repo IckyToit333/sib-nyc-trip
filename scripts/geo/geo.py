@@ -372,6 +372,49 @@ def main():
             prev = p
         save_cache()
 
+    # 3. detours: skipping 1-3 consecutive stops (not stations) re-routes from the stop before to the stop after
+    out['bypass'] = {}
+    for d in src['days']:
+        seq = [s for s in d['stops'] if pos(s)]
+        for i in range(len(seq)):
+            for k in (1, 2, 3):
+                j = i + k + 1
+                if j >= len(seq):
+                    break
+                skipped = seq[i + 1:j]
+                if any(x.get('kind') == 'hub' for x in skipped):
+                    break
+                A, C = seq[i], seq[j]
+                vias = [(x.get('via') or {}) for x in seq[i + 1:j + 1]]
+                modes = [v.get('m', 'walk') for v in vias]
+                if 'train' in modes:
+                    continue
+                a, c = pos(A), pos(C)
+                key = f"{A['id']}>{C['id']}"
+                path, mode = None, 'walk'
+                try:
+                    if 'ferry' in modes:
+                        mode = 'ferry'
+                    elif 'subway' in modes:
+                        mode = 'subway'
+                        lines = []
+                        for v in vias:
+                            for l in v.get('lines') or []:
+                                if l not in lines:
+                                    lines.append(l)
+                        if subway_lines is None:
+                            subway_lines = load_subway()
+                        path = subway_path(a, c, lines, subway_lines, stations)
+                    else:
+                        path = walk_path(a, c)
+                except Exception as e:  # noqa
+                    report.append({'id': key, 'issue': f'detour failed: {e}'})
+                if dist(a, c) < 25:
+                    continue
+                out['bypass'][key] = {'mode': mode, 'path': path or [list(a), list(c)]}
+        save_cache()
+    print('detours', len(out['bypass']))
+
     json.dump(out, open(out_path, 'w'), separators=(',', ':'))
     print(json.dumps(report, indent=1))
     print('stops pinned', len(out['stops']), 'legs', len(out['legs']))

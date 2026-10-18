@@ -1,5 +1,6 @@
 import { maplibregl, PMTiles, Protocol, FileSource, basemaps } from '../vendor/libs.js';
 import { ICONS } from './icons.js';
+import { effectiveLegs } from './routes.js';
 
 export const MAP_URL = 'map/nyc.pmtiles';
 export const MAP_CACHE = 'sib-offline-map';
@@ -121,19 +122,10 @@ export class TripMap {
   addOverlays() {
     const m = this.map;
     if (m.getSource('legs')) return;
-    const legs = []; const dots = [];
+    const legs = this.legFeatures(); const dots = [];
     for (const d of this.days) {
-      let prev = null;
       for (const s of d.stops) {
-        if (!s.at) continue;
-        const mode = s.via?.m || 'walk';
-        if (s.path && mode !== 'train') {
-          legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode }, geometry: { type: 'LineString', coordinates: s.path } });
-        } else if (prev && !(prev[0] === s.at[0] && prev[1] === s.at[1]) && mode !== 'train') {
-          legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode }, geometry: { type: 'LineString', coordinates: [prev, s.at] } });
-        }
-        prev = s.at;
-        if (s.kind !== 'hub') dots.push({ type: 'Feature', properties: { day: d.id, stop: s.id, color: d.color }, geometry: { type: 'Point', coordinates: s.at } });
+        if (s.at && s.kind !== 'hub') dots.push({ type: 'Feature', properties: { day: d.id, stop: s.id, color: d.color }, geometry: { type: 'Point', coordinates: s.at } });
       }
     }
     m.addSource('legs', { type: 'geojson', data: { type: 'FeatureCollection', features: legs } });
@@ -172,8 +164,20 @@ export class TripMap {
     }
   }
 
+  legFeatures() {
+    const out = [];
+    for (const d of this.days) {
+      for (const l of effectiveLegs(d, this.status)) {
+        out.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode: l.mode }, geometry: { type: 'LineString', coordinates: l.path } });
+      }
+    }
+    return out;
+  }
+
   setStatus(status) {
     this.status = status;
+    const src = this.map && this.map.getSource && this.map.getSource('legs');
+    if (src) src.setData({ type: 'FeatureCollection', features: this.legFeatures() });
     for (const [id, m] of this.markers) {
       const st = status[id]?.s;
       m.node.classList.toggle('done', st === 'done');

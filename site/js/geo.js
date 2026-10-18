@@ -1,4 +1,6 @@
 // Applies OpenStreetMap-checked pins and street/track routes (built by scripts/geo/geo.py) to the itinerary.
+export const BYPASS = {};
+
 export async function applyGeo(days) {
   let geo = null;
   try { geo = await (await fetch('geo.json')).json(); } catch { return null; }
@@ -10,5 +12,6 @@ export async function applyGeo(days) {
       if (l && l.path && l.path.length > 1) s.path = l.path;
     }
   }
+  Object.assign(BYPASS, geo.bypass || {});
   return geo;
 }
