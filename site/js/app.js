@@ -185,7 +185,7 @@ function renderSheet(scrollToSel = true) {
   });
   if (scrollToSel && ui.sel) {
     const node = document.getElementById('stop-' + ui.sel);
-    node && node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (node) body.scrollTo({ top: Math.max(0, node.offsetTop - body.offsetTop - 8), behavior: 'smooth' });
   }
   layoutSheet(false);
 }
@@ -278,7 +278,7 @@ function sheetMetrics() {
   const h = sheetEl.offsetHeight;
   const vh = $('#app').offsetHeight;
   const peekVisible = 22 + $('#sheetHead').offsetHeight + 6;
-  return { h, positions: { full: 0, half: Math.max(0, h - Math.round(vh * 0.5)), peek: Math.max(0, h - peekVisible) } };
+  return { h, positions: { full: 0, half: Math.max(0, h - Math.round(vh * 0.46)), peek: Math.max(0, h - peekVisible) } };
 }
 function layoutSheet(refit = true) {
   const top = $('.top');
@@ -294,7 +294,9 @@ function layoutSheet(refit = true) {
   sheetEl.style.setProperty('--sheet-y', y + 'px');
   const visible = Math.min(h - y, $('#app').offsetHeight * 0.6);
   document.documentElement.style.setProperty('--sheet-visible', visible + 'px');
-  tripMap && tripMap.setPadding({ top: top.offsetHeight + 24, bottom: visible + 24, left: 36, right: 60 });
+  const notice = $('#mapNotice');
+  const noticeH = notice.hidden ? 0 : notice.offsetHeight + 8;
+  tripMap && tripMap.setPadding({ top: top.offsetHeight + noticeH + 24, bottom: visible + 24, left: 36, right: 60 });
   if (refit && tripMap && ui.mapReady && ui.sheet !== 'full') tripMap.fit();
 }
 function setSheet(pos, refit = true) { ui.sheet = pos; layoutSheet(refit); }
