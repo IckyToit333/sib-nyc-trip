@@ -122,7 +122,7 @@ function dayPage(d, img) {
 function cover() {
   return `<section class="page cover">
     <h1>NYC · Dec 2026</h1>
-    <h2>Offline backup · 23 Dec 2026 – 1 Jan 2027 · Ty, Tim, Ash & DT</h2>
+    <h2>Offline backup · 23 Dec 2026 – 1 Jan 2027 · Tylah, Tim, Ashlee & Du Toit</h2>
     <h3>Bases</h3>
     <ul><li><b>Home:</b> Ossining, NY (Metro-North Hudson Line, ~55 min to Grand Central)</li>
     <li><b>30 Dec:</b> Westin Grand Central, 212 E 42nd St</li></ul>

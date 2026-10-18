@@ -6,7 +6,7 @@ export const TRIP = {
   id: 'sib-nyc-2026',
   title: 'NYC · Dec 2026',
   timezone: 'America/New_York',
-  people: ['Ty', 'Tim', 'Ash', 'DT'],
+  people: ['Tylah', 'Tim', 'Ashlee', 'Du Toit', 'Dylan', 'Kristen'],
   home: { name: 'Ossining (home base)', at: [-73.8693, 41.1576] },
   hotel: { name: 'Westin Grand Central', at: [-73.9733, 40.7505] },
   pdf: 'sib-nyc-trip-backup.pdf',
@@ -111,7 +111,7 @@ export const DAYS = [
     title: 'Lower Manhattan, Financial District & Tribeca',
     start: '8:00 am train',
     end: '5:15 pm subway to Grand Central, then train home',
-    tips: ['Ty & Tim’s Statue of Liberty / Enoteca Maria (Staten Island) plan is separate.'],
+    tips: ['Tylah & Tim’s Statue of Liberty / Enoteca Maria (Staten Island) plan is separate.'],
     stops: [
       { id: '28-bowling', stn: "Bowling Green", t: '9:00', name: 'Bowling Green station', at: [-74.0140, 40.7047], kind: 'hub', via: { m: 'subway', lines: ['4', '5'], text: 'Grand Central → Bowling Green (~15 min)' } },
       { id: '28-battery', q: "Castle Clinton", t: '9:20', name: 'Battery Park & Castle Clinton', at: [-74.0168, 40.7034], cost: 'Free', note: 'Waterfront views of the Statue of Liberty and Ellis Island.' },

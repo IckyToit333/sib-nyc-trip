@@ -23,7 +23,12 @@ DAYS.forEach((d) => d.stops.forEach((s) => STOP_BY_ID.set(s.id, { day: d, stop: 
 const ui = {
   dayId: null,
   sel: null,
-  who: LS.get('sib.who', null),
+  who: (() => { // earlier versions stored short names
+    const w = LS.get('sib.who', null);
+    const full = { Ty: 'Tylah', Ash: 'Ashlee', DT: 'Du Toit' }[w];
+    if (full) LS.set('sib.who', full);
+    return full || w;
+  })(),
   shared: { status: {}, notes: {}, online: navigator.onLine, ready: false, pending: false, lastServerSync: 0, error: null },
   sheet: 'half',
   version: null,
