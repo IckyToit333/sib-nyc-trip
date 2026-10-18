@@ -74,7 +74,8 @@ async function renderMaps() {
     if (d.home || !d.stops.some((s) => s.at)) {
       map.jumpTo({ center: TRIP.home.at, zoom: 14 });
     } else {
-      const coords = d.stops.filter((s) => s.at).map((s) => s.at);
+      let coords = d.stops.filter((s) => s.at && s.kind !== 'hub').map((s) => s.at);
+      if (!coords.length) coords = d.stops.filter((s) => s.at).map((s) => s.at);
       const b = new maplibregl.LngLatBounds(coords[0], coords[0]);
       coords.forEach((c) => b.extend(c));
       map.fitBounds(b, { padding: 45, maxZoom: 16, duration: 0 });

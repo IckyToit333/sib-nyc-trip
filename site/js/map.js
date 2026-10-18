@@ -214,7 +214,9 @@ export class TripMap {
     } else {
       const d = this.days.find((x) => x.id === this.dayId);
       if (d?.home) { this.map.flyTo({ center: this.trip.home.at, zoom: 13.5, padding: this.padding, duration: animate ? 800 : 0 }); return; }
-      for (const s of d?.stops || []) if (s.at) pts.push(s.at);
+      // Frame the places you visit; stations and the trip home to Grand Central sit outside if needed.
+      for (const s of d?.stops || []) if (s.at && s.kind !== 'hub') pts.push(s.at);
+      if (!pts.length) for (const s of d?.stops || []) if (s.at) pts.push(s.at);
     }
     if (!pts.length) return;
     const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
