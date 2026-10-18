@@ -7,14 +7,14 @@ const RUNTIME = 'sib-runtime-' + BUILD;
 const CORE = [
   './', 'index.html', 'manifest.webmanifest',
   'css/app.css',
-  'js/app.js', 'js/data.js', 'js/sync.js', 'js/map.js', 'js/icons.js',
+  'js/app.js', 'js/data.js', 'js/sync.js', 'js/map.js', 'js/icons.js', 'js/geo.js',
   'vendor/libs.js', 'vendor/maplibre-gl.css',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 const FONT_STACKS = ['Noto Sans Regular', 'Noto Sans Medium', 'Noto Sans Italic'];
 const FONT_RANGES = ['0-255', '256-511', '8192-8447'];
 const OPTIONAL = [
-  'version.json',
+  'version.json', 'geo.json',
   'vendor/sprites/v4/light.json', 'vendor/sprites/v4/light.png',
   'vendor/sprites/v4/light@2x.json', 'vendor/sprites/v4/light@2x.png',
   ...FONT_STACKS.flatMap((f) => FONT_RANGES.map((r) => `vendor/fonts/${encodeURIComponent(f)}/${r}.pbf`)),

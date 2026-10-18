@@ -30,6 +30,22 @@ jobs:
       - name: Bundle libraries (map, offline tiles, Firebase)
         run: npm run build:libs
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore place and route cache
+        uses: actions/cache@v4
+        with:
+          path: geo-cache
+          key: geo-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: geo-
+
+      - name: Pin stops and route legs on OpenStreetMap
+        run: |
+          node scripts/geo/dump.mjs > /tmp/stops.json
+          python3 scripts/geo/geo.py /tmp/stops.json site/geo.json || echo '{"stops":{},"legs":{},"report":[{"issue":"geo step failed"}]}' > site/geo.json
+
       - name: Map fonts and icons
         run: |
           git clone --depth 1 https://github.com/protomaps/basemaps-assets /tmp/assets

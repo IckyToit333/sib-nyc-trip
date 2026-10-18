@@ -127,7 +127,9 @@ export class TripMap {
       for (const s of d.stops) {
         if (!s.at) continue;
         const mode = s.via?.m || 'walk';
-        if (prev && !(prev[0] === s.at[0] && prev[1] === s.at[1]) && mode !== 'train') {
+        if (s.path && mode !== 'train') {
+          legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode }, geometry: { type: 'LineString', coordinates: s.path } });
+        } else if (prev && !(prev[0] === s.at[0] && prev[1] === s.at[1]) && mode !== 'train') {
           legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode }, geometry: { type: 'LineString', coordinates: [prev, s.at] } });
         }
         prev = s.at;

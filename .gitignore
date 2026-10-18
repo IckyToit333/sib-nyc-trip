@@ -2,3 +2,5 @@ node_modules/
 site/vendor/
 site/map/
 site/sib-nyc-trip-backup.pdf
+geo-cache/
+site/geo.json

@@ -2,6 +2,7 @@
 import { maplibregl, PMTiles, FileSource } from '../vendor/libs.js';
 import { TRIP, DAYS, LINE_COLORS } from './data.js';
 import { makeStyle, protocol, MAP_URL } from './map.js';
+import { applyGeo } from './geo.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const log = (...a) => console.log('[print]', ...a);
@@ -22,7 +23,9 @@ function features() {
       if (!hub) n++;
       if (!s.at) continue;
       const mode = s.via?.m || 'walk';
-      if (prev && mode !== 'train' && !(prev[0] === s.at[0] && prev[1] === s.at[1])) {
+      if (s.path && mode !== 'train') {
+        legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, walk: mode === 'walk' }, geometry: { type: 'LineString', coordinates: s.path } });
+      } else if (prev && mode !== 'train' && !(prev[0] === s.at[0] && prev[1] === s.at[1])) {
         legs.push({ type: 'Feature', properties: { day: d.id, color: d.color, walk: mode === 'walk' }, geometry: { type: 'LineString', coordinates: [prev, s.at] } });
       }
       prev = s.at;
@@ -143,6 +146,7 @@ function cover() {
 
 (async () => {
   try {
+    await applyGeo(DAYS);
     const imgs = await renderMaps();
     document.getElementById('pages').innerHTML = cover() + DAYS.map((d) => dayPage(d, imgs[d.id])).join('');
     await Promise.all([...document.images].map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; }))));

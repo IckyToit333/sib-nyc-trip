@@ -2,6 +2,7 @@ import { TRIP, DAYS, LINE_COLORS } from './data.js';
 import { ICONS } from './icons.js';
 import { createSync } from './sync.js';
 import { TripMap, downloadMap, deleteMap, isMapDownloaded } from './map.js';
+import { applyGeo } from './geo.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -84,8 +85,10 @@ function legHTML(s) {
 function directions(s) {
   const [lng, lat] = s.at;
   const transit = s.via && s.via.m !== 'walk';
-  const g = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=${transit ? 'transit' : 'walking'}`;
-  const a = `https://maps.apple.com/?daddr=${lat},${lng}&dirflg=${transit ? 'r' : 'w'}`;
+  // Hand the place name to the maps app so it navigates to its own exact entry for the place.
+  const place = s.q ? `${s.q}, New York, NY` : s.stn ? `${s.stn} station, New York, NY` : `${lat},${lng}`;
+  const g = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place)}&travelmode=${transit ? 'transit' : 'walking'}`;
+  const a = `https://maps.apple.com/?daddr=${encodeURIComponent(place)}&sll=${lat},${lng}&dirflg=${transit ? 'r' : 'w'}`;
   return `<a class="btn" href="${g}" target="_blank" rel="noopener">${ICONS.nav} Google Maps</a>${isApple ? `<a class="btn" href="${a}" target="_blank" rel="noopener">${ICONS.nav} Apple Maps</a>` : ''}`;
 }
 function stopHTML(d, s, nextId) {
@@ -489,6 +492,7 @@ function initialDay() {
 }
 
 (async function boot() {
+  await applyGeo(DAYS);
   const start = initialDay();
   ui.dayId = start.day; ui.sel = start.stop;
   renderTabs(); renderPill();
