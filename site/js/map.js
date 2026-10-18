@@ -213,12 +213,15 @@ export class TripMap {
       for (const d of this.days) for (const s of d.stops) if (s.at) pts.push(s.at);
     } else {
       const d = this.days.find((x) => x.id === this.dayId);
+      // flyTo/easeTo leave their padding on the map, and fitBounds would add it again; reset first.
+      this.map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
       if (d?.home) { this.map.flyTo({ center: this.trip.home.at, zoom: 13.5, padding: this.padding, duration: animate ? 800 : 0 }); return; }
       // Frame the places you visit; stations and the trip home to Grand Central sit outside if needed.
       for (const s of d?.stops || []) if (s.at && s.kind !== 'hub') pts.push(s.at);
       if (!pts.length) for (const s of d?.stops || []) if (s.at) pts.push(s.at);
     }
     if (!pts.length) return;
+    this.map.setPadding({ top: 0, bottom: 0, left: 0, right: 0 });
     const b = new maplibregl.LngLatBounds(pts[0], pts[0]);
     pts.forEach((p) => b.extend(p));
     this.map.fitBounds(b, { padding: this.padding, maxZoom: 15.5, duration: animate ? 800 : 0 });

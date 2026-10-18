@@ -10,13 +10,15 @@ export const TRIP = {
   home: { name: 'Ossining (home base)', at: [-73.8693, 41.1576] },
   hotel: { name: 'Westin Grand Central', at: [-73.9733, 40.7505] },
   pdf: 'sib-nyc-trip-backup.pdf',
+  // Ossining ↔ Grand Central by rail, one way (Metro-North Hudson Line, about 31.4 miles).
+  metroNorthKm: 50.5,
 };
 
 export const GCT = [-73.9772, 40.7527];
 
 export const DAYS = [
   {
-    id: 'd23', date: '2026-12-23', dow: 'Wed', num: '23', color: '#C8372D',
+    id: 'd23', mn: 2, date: '2026-12-23', dow: 'Wed', num: '23', color: '#C8372D',
     title: 'Midtown, MoMA, Fifth Avenue & Columbus Circle',
     start: '8:00 am train from Ossining (Day Pass), arrive Grand Central ~8:55',
     end: '6:30 pm train home',
@@ -40,7 +42,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd24', date: '2026-12-24', dow: 'Thu', num: '24', color: '#D9731A',
+    id: 'd24', mn: 2, date: '2026-12-24', dow: 'Thu', num: '24', color: '#D9731A',
     title: 'Union Square, Flatiron & crab shopping',
     start: '8:00 am train (Day Pass). Check the Christmas Eve timetable.',
     end: '4:30 pm subway to Grand Central, then train home',
@@ -57,7 +59,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd25', date: '2026-12-25', dow: 'Fri', num: '25', color: '#5B6878', home: true,
+    id: 'd25', mn: 0, date: '2026-12-25', dow: 'Fri', num: '25', color: '#5B6878', home: true,
     title: 'Christmas Day at home 🎄',
     start: 'At home in Ossining all day',
     end: '',
@@ -65,7 +67,7 @@ export const DAYS = [
     stops: [],
   },
   {
-    id: 'd26', date: '2026-12-26', dow: 'Sat', num: '26', color: '#A97C00',
+    id: 'd26', mn: 2, date: '2026-12-26', dow: 'Sat', num: '26', color: '#A97C00',
     title: 'Chinatown, Little Italy, SoHo & Greenwich Village',
     start: '8:00 am train (weekend timetable). The Weekly ticket starts today.',
     end: '4:30 pm subway to Grand Central; train home ~5:30',
@@ -86,7 +88,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd27', date: '2026-12-27', dow: 'Sun', num: '27', color: '#2E8B57',
+    id: 'd27', mn: 2, date: '2026-12-27', dow: 'Sun', num: '27', color: '#2E8B57',
     title: 'Little Island, High Line, Chelsea Market & Hudson Yards',
     start: '8:00 am train (weekend timetable)',
     end: '5:30 pm train home',
@@ -105,7 +107,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd28', date: '2026-12-28', dow: 'Mon', num: '28', color: '#1F6FB2',
+    id: 'd28', mn: 2, date: '2026-12-28', dow: 'Mon', num: '28', color: '#1F6FB2',
     title: 'Lower Manhattan, Financial District & Tribeca',
     start: '8:00 am train',
     end: '5:15 pm subway to Grand Central, then train home',
@@ -127,7 +129,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd29', date: '2026-12-29', dow: 'Tue', num: '29', color: '#6B43B8',
+    id: 'd29', mn: 2, date: '2026-12-29', dow: 'Tue', num: '29', color: '#6B43B8',
     title: 'Central Park & Museum of Natural History',
     start: '8:00 am train',
     end: '6:15 pm subway to Grand Central, then train home',
@@ -148,7 +150,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd30', date: '2026-12-30', dow: 'Wed', num: '30', color: '#C2185B',
+    id: 'd30', mn: 1, date: '2026-12-30', dow: 'Wed', num: '30', color: '#C2185B',
     title: 'Matinee, Midtown at night & speakeasy',
     start: 'Morning at home: Ossining groceries for the NYE dinner; pack overnight bags. ~11:50 am train, arrive ~12:45.',
     end: 'Overnight at the Westin Grand Central',
@@ -163,7 +165,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd31', date: '2026-12-31', dow: 'Thu', num: '31', color: '#00838F',
+    id: 'd31', mn: 1, date: '2026-12-31', dow: 'Thu', num: '31', color: '#00838F',
     title: 'Brooklyn Bridge, DUMBO & Williamsburg',
     start: '8:00 am check out, leave bags at the Westin bell desk, coffee & bagel',
     end: '3:30 pm train home before the NYE crowds. Celebrate in Ossining.',
@@ -182,7 +184,7 @@ export const DAYS = [
     ],
   },
   {
-    id: 'd01', date: '2027-01-01', dow: 'Fri', num: '1 Jan', color: '#8A5A2B',
+    id: 'd01', mn: 2, date: '2027-01-01', dow: 'Fri', num: '1 Jan', color: '#8A5A2B',
     title: 'Flushing dumplings + anything missed',
     start: '9:00 am train (check the holiday timetable)',
     end: '6:00 pm train home. Pack for 2 Jan flights.',

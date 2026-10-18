@@ -3,6 +3,7 @@ import { ICONS } from './icons.js';
 import { createSync } from './sync.js';
 import { TripMap, downloadMap, deleteMap, isMapDownloaded } from './map.js';
 import { applyGeo } from './geo.js';
+import { dayDistances, fmtKm } from './stats.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -129,6 +130,16 @@ function stopHTML(d, s, nextId) {
     </div>${more}</li>`;
 }
 
+function statsHTML(dist) {
+  const transitLabel = dist.ferry > 0.05 ? 'subway & ferry' : 'subway';
+  const transit = dist.subway + dist.ferry;
+  return `<div class="stats">
+    <div class="stat"><span class="stat-ico">${ICONS.walk}</span><b>${fmtKm(dist.walk)}</b><small>walking${dist.steps ? ` · ~${dist.steps.toLocaleString('en-US')} steps` : ''}</small></div>
+    <div class="stat"><span class="stat-ico">${ICONS.train}</span><b>${transit > 0.05 ? fmtKm(transit) : '–'}</b><small>${transitLabel}</small></div>
+    <div class="stat"><span class="stat-ico">${ICONS.train}</span><b>${dist.rail ? fmtKm(dist.rail) : '–'}</b><small>Metro-North</small></div>
+  </div>`;
+}
+
 function transitLinks() {
   const g = (o, d) => `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(o)}&destination=${encodeURIComponent(d)}&travelmode=transit`;
   return `<div class="links">
@@ -151,14 +162,18 @@ function renderSheet(scrollToSel = true) {
   if (ui.dayId === 'all') {
     document.documentElement.style.setProperty('--day', 'var(--ink)');
     let done = 0; let total = 0;
-    DAYS.forEach((d) => { const p = dayProgress(d); done += p.done; total += p.total; });
+    const sum = { walk: 0, subway: 0, ferry: 0, rail: 0, steps: 0 };
+    DAYS.forEach((d) => {
+      const p = dayProgress(d); done += p.done; total += p.total;
+      const x = dayDistances(d); for (const k of Object.keys(sum)) sum[k] += x[k];
+    });
     head.innerHTML = `<div class="dh-date">23 Dec – 1 Jan<span class="count">${done} of ${total} done</span></div>
       <h2 class="dh-title">The whole trip</h2><div class="dh-prog"><b style="width:${total ? (done / total) * 100 : 0}%"></b></div>`;
-    body.innerHTML = DAYS.map((d) => {
+    body.innerHTML = `<div class="day-meta">${statsHTML(sum)}<p class="small-note">Walking between stops only. Wandering inside parks, markets and museums adds more.</p></div>` + DAYS.map((d) => {
       const p = dayProgress(d);
       return `<button class="day-card" style="--c:${d.color}" data-act="day" data-id="${d.id}"><span class="sw"></span>
         <span><div class="dc-date">${d.dow} ${d.num}${d.date === TODAY ? ' · Today' : ''}</div><div class="dc-title">${esc(d.title)}</div>
-        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
+        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${fmtKm(dayDistances(d).walk)} walking · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
     }).join('');
   } else {
     const d = DAYS.find((x) => x.id === ui.dayId);
@@ -171,6 +186,7 @@ function renderSheet(scrollToSel = true) {
     } else {
       const nextId = d.date === TODAY ? d.stops.find((s) => s.kind !== 'hub' && !statusOf(s.id))?.id : null;
       const meta = `<div class="day-meta">
+        ${statsHTML(dayDistances(d))}
         <div class="row">${ICONS.clock}<span>${esc(d.start)}</span></div>
         ${d.end ? `<div class="row">${ICONS.flagEnd}<span>${esc(d.end)}</span></div>` : ''}
         ${d.tips?.length ? `<ul>${d.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}

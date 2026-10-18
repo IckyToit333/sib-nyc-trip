@@ -3,6 +3,7 @@ import { maplibregl, PMTiles, FileSource } from '../vendor/libs.js';
 import { TRIP, DAYS, LINE_COLORS } from './data.js';
 import { makeStyle, protocol, MAP_URL } from './map.js';
 import { applyGeo } from './geo.js';
+import { dayDistances, fmtKm } from './stats.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const log = (...a) => console.log('[print]', ...a);
@@ -111,6 +112,7 @@ function dayPage(d, img) {
   return `<section class="page">
     <div class="band" style="background:${d.color}"><span class="d">${date}</span><span class="t">${esc(d.title)}</span></div>
     <div class="meta"><b>Start:</b> ${esc(d.start)}${d.end ? ` &nbsp;·&nbsp; <b>End:</b> ${esc(d.end)}` : ''}</div>
+    <div class="meta">${(() => { const x = dayDistances(d); const t = x.subway + x.ferry; return `<b>Walking:</b> ${fmtKm(x.walk)} (~${x.steps.toLocaleString('en-US')} steps) &nbsp;·&nbsp; <b>${x.ferry > 0.05 ? 'Subway & ferry' : 'Subway'}:</b> ${t > 0.05 ? fmtKm(t) : '–'} &nbsp;·&nbsp; <b>Metro-North:</b> ${x.rail ? fmtKm(x.rail) : '–'}`; })()}</div>
     <img class="mapimg" src="${img}" alt="">
     <table>${rows}</table>
     ${d.tips?.length ? `<ul class="tips">${d.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
