@@ -281,3 +281,48 @@ svg { display: block; }
   .panel { left: auto; right: 16px; bottom: 16px; width: 400px; border-radius: 20px; }
   .panel-center { right: 0; left: 0; bottom: auto; }
 }
+
+/* ---------- Added stops ---------- */
+.pin.added { border-style: dashed; font-size: 17px; }
+.badge.added { font-size: 17px; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .55); }
+.tag.added { background: #EAF4EE; color: #23704A; }
+.btn.danger { color: var(--bad); }
+.btn.wide { width: 100%; margin-top: 8px; }
+.btn[disabled] { opacity: .45; }
+.add-stop {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 48px; margin: 4px 0 8px;
+  border: 1.5px dashed color-mix(in srgb, var(--day) 55%, var(--line)); border-radius: var(--r); background: transparent;
+  color: var(--day); font-weight: 800; font-size: 14px;
+}
+.search { display: flex; gap: 6px; }
+.search input, .add-form input, .add-form select, .add-form textarea {
+  width: 100%; font: inherit; font-size: 16px; padding: 10px 11px; border-radius: 11px; border: 1px solid var(--line);
+  background: var(--card); color: var(--ink); min-width: 0;
+}
+.search input { flex: 1; }
+.results { display: grid; gap: 6px; margin-top: 8px; }
+.result { text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 9px 11px; }
+.result b { display: block; font-size: 14.5px; }
+.result small { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.card.picked { border-color: var(--ok); }
+.card.picked svg { color: var(--ok); }
+.add-form { display: grid; gap: 10px; }
+.add-form label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.add-form .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg button { height: 40px; border-radius: 11px; border: 1px solid var(--line); background: var(--card); font-weight: 700; font-size: 13.5px; }
+.seg button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.crosshair { position: absolute; z-index: 30; width: 0; height: 0; pointer-events: none; }
+.crosshair span {
+  position: absolute; left: -14px; top: -38px; width: 28px; height: 38px;
+  background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 38'%3E%3Cpath d='M14 37S2 24 2 14a12 12 0 0 1 24 0c0 10-12 23-12 23z' fill='%23C2185B' stroke='white' stroke-width='2.5'/%3E%3Ccircle cx='14' cy='14' r='4.5' fill='white'/%3E%3C/svg%3E");
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,.3));
+}
+.pick-bar {
+  position: absolute; z-index: 31; left: 12px; right: 12px; bottom: calc(12px + var(--safe-b));
+  background: var(--paper); border-radius: 16px; box-shadow: var(--shadow); padding: 12px;
+}
+.pick-bar p { margin: 0 0 10px; font-size: 14px; font-weight: 600; text-align: center; }
+.pick-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.pick-actions .btn { height: 44px; }
+@media (min-width: 860px) { .pick-bar { left: calc(var(--panel-w) + 16px); right: 16px; max-width: 460px; margin: 0 auto; } }

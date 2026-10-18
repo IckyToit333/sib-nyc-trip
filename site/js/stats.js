@@ -10,9 +10,9 @@ function km(a, b) {
 }
 const lineKm = (pts) => pts.slice(1).reduce((t, p, i) => t + km(pts[i], p), 0);
 
-export function dayDistances(day, status = {}) {
+export function dayDistances(day, status = {}, routes = {}) {
   const out = { walk: 0, subway: 0, ferry: 0, rail: (day.mn || 0) * TRIP.metroNorthKm };
-  for (const l of effectiveLegs(day, status)) {
+  for (const l of effectiveLegs(day, status, routes)) {
     const d = lineKm(l.path);
     if (l.mode === 'walk') out.walk += d;
     else if (l.mode === 'ferry') out.ferry += d;

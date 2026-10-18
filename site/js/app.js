@@ -4,6 +4,8 @@ import { createSync } from './sync.js';
 import { TripMap, downloadMap, deleteMap, isMapDownloaded } from './map.js';
 import { applyGeo } from './geo.js';
 import { dayDistances, fmtKm } from './stats.js';
+import { markOriginalOrder, effectiveLegs } from './routes.js';
+import { searchPlaces, nameForSpot, routeMissing } from './live.js';
 
 const $ = (sel) => document.querySelector(sel);
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -15,9 +17,51 @@ const isWide = () => matchMedia('(min-width: 860px)').matches;
 const isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
 
 const STOP_BY_ID = new Map();
-DAYS.forEach((d) => d.stops.forEach((s) => STOP_BY_ID.set(s.id, { day: d, stop: s })));
-{ // number the non-transit stops per day
+const indexStops = () => { STOP_BY_ID.clear(); DAYS.forEach((d) => d.stops.forEach((s) => STOP_BY_ID.set(s.id, { day: d, stop: s }))); };
+indexStops();
+{ // number the planned (non-transit) stops per day; added stops show a "+"
   for (const d of DAYS) { let n = 0; for (const s of d.stops) s._n = s.kind === 'hub' ? null : ++n; }
+}
+
+// ---------- Added stops (shared through Firebase) ----------
+let addedSig = '';
+function applyAdded() {
+  const list = Object.entries(ui.shared.added || {}).map(([id, a]) => ({ id, ...a }))
+    .filter((a) => typeof a.lng === 'number' && typeof a.lat === 'number' && a.name)
+    .sort((a, b) => (a.created || 0) - (b.created || 0));
+  const sig = JSON.stringify(list.map((a) => [a.id, a.day, a.after, a.lng, a.lat, a.name, a.t, a.cost, a.kind, a.note]));
+  if (sig === addedSig) return false;
+  addedSig = sig;
+  for (const d of DAYS) d.stops = d.stops.filter((s) => !s.added);
+  for (const a of list) {
+    const d = DAYS.find((x) => x.id === a.day);
+    if (!d || d.home) continue;
+    const stop = {
+      id: a.id, added: true, by: a.by, created: a.created, _n: '+', _anchor: a.after || null,
+      t: a.t || '', name: a.name, at: [a.lng, a.lat], kind: a.kind === 'food' ? 'food' : undefined,
+      cost: a.cost || '', note: a.note || '', q: a.q || null,
+    };
+    let idx = a.after ? d.stops.findIndex((s) => s.id === a.after) : -1;
+    if (a.after && idx < 0) idx = d.stops.length - 1;
+    let j = idx + 1;
+    while (j < d.stops.length && d.stops[j].added && d.stops[j]._anchor === stop._anchor) j++;
+    d.stops.splice(j, 0, stop);
+  }
+  indexStops();
+  if (ui.sel && !STOP_BY_ID.has(ui.sel)) ui.sel = null;
+  return true;
+}
+
+// Work out walking routes for legs that touch added stops, once, on whichever phone is online.
+function requestMissingRoutes() {
+  if (!ui.shared.ready || !navigator.onLine) return;
+  const needs = [];
+  for (const d of DAYS) {
+    for (const l of effectiveLegs(d, ui.shared.status, ui.shared.routes)) {
+      if (l.need) needs.push({ key: l.need, from: l.path[0], to: l.path[l.path.length - 1] });
+    }
+  }
+  if (needs.length) routeMissing(needs, (key, mode, path) => sync.saveRoute(key, mode, path));
 }
 
 const ui = {
@@ -49,10 +93,12 @@ const todayDay = DAYS.find((d) => d.date === TODAY);
 // ---------- Shared state ----------
 const sync = createSync(TRIP.id, (snap) => {
   ui.shared = snap;
+  const changed = applyAdded();
   renderPill();
   renderTabs();
   renderSheet(false);
-  tripMap && ui.mapReady && tripMap.setStatus(snap.status);
+  tripMap && ui.mapReady && tripMap.update(snap.status, snap.routes, changed);
+  requestMissingRoutes();
 });
 ui.shared = sync.snapshot();
 
@@ -102,12 +148,13 @@ function stopHTML(d, s, nextId) {
   const sel = ui.sel === s.id;
   const notes = notesFor(s.id);
   const hub = s.kind === 'hub';
-  const badge = hub ? `<span class="badge hub"></span>` : `<span class="badge ${s.kind === 'food' ? 'food' : ''}">${st === 'done' ? ICONS.tickSm : s._n}</span>`;
+  const badge = hub ? `<span class="badge hub"></span>` : `<span class="badge ${s.kind === 'food' ? 'food' : ''} ${s.added ? 'added' : ''}">${st === 'done' ? ICONS.tickSm : s._n}</span>`;
   const tags = [
     s.cost && !hub ? `<span class="tag">${esc(s.cost)}</span>` : '',
     s.flag ? `<span class="tag flag">${esc(s.flag)}</span>` : '',
     nextId === s.id ? '<span class="tag next">Next</span>' : '',
     notes.length ? `<span class="tag notes">${notes.length} note${notes.length > 1 ? 's' : ''}</span>` : '',
+    s.added ? `<span class="tag added">Added by ${esc(s.by || 'someone')}</span>` : '',
   ].join('');
   const statusInfo = ui.shared.status[s.id];
   const more = sel ? `
@@ -118,7 +165,10 @@ function stopHTML(d, s, nextId) {
         <button class="btn ${st === 'done' ? 'on' : ''}" data-act="done" data-id="${s.id}">${ICONS.tickSm} ${st === 'done' ? 'Done' : 'Mark done'}</button>
         ${hub ? '' : `<button class="btn ${st === 'skip' ? 'on-skip' : ''}" data-act="skip" data-id="${s.id}">${ICONS.skip} ${st === 'skip' ? 'Skipped' : 'Skip'}</button>`}
         ${s.at ? directions(s) : ''}
+        ${hub ? '' : `<button class="btn" data-act="add-after" data-id="${s.id}">${ICONS.plus} Add a stop after this</button>`}
+        ${s.added ? `<button class="btn danger" data-act="remove-added" data-id="${s.id}">${ICONS.trash} Remove</button>` : ''}
       </div>
+      ${s.added ? `<p class="who-line" style="margin-top:8px">Added by ${esc(s.by || 'someone')} · ${fmtWhen(s.created)}</p>` : ''}
       <div class="notes">
         ${notes.map(([nid, n]) => `<div class="note"><div class="meta">${esc(n.by || 'Someone')} · ${fmtWhen(n.at)}</div>${esc(n.text)}${n.by && n.by === ui.who ? `<button class="del" data-act="note-del" data-id="${nid}" aria-label="Delete note">${ICONS.trash}</button>` : ''}</div>`).join('')}
       </div>
@@ -170,7 +220,7 @@ function renderSheet(scrollToSel = true) {
     const sum = { walk: 0, subway: 0, ferry: 0, rail: 0, steps: 0 };
     DAYS.forEach((d) => {
       const p = dayProgress(d); done += p.done; total += p.total;
-      const x = dayDistances(d, ui.shared.status); for (const k of Object.keys(sum)) sum[k] += x[k];
+      const x = dayDistances(d, ui.shared.status, ui.shared.routes); for (const k of Object.keys(sum)) sum[k] += x[k];
     });
     head.innerHTML = `<div class="dh-date">23 Dec – 1 Jan<span class="count">${done} of ${total} done</span></div>
       <h2 class="dh-title">The whole trip</h2><div class="dh-prog"><b style="width:${total ? (done / total) * 100 : 0}%"></b></div>`;
@@ -178,7 +228,7 @@ function renderSheet(scrollToSel = true) {
       const p = dayProgress(d);
       return `<button class="day-card" style="--c:${d.color}" data-act="day" data-id="${d.id}"><span class="sw"></span>
         <span><div class="dc-date">${d.dow} ${d.num}${d.date === TODAY ? ' · Today' : ''}</div><div class="dc-title">${esc(d.title)}</div>
-        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${fmtKm(dayDistances(d, ui.shared.status).walk)} walking · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
+        <div class="dc-sub">${d.home ? 'At home' : `${p.total} stops · ${fmtKm(dayDistances(d, ui.shared.status, ui.shared.routes).walk)} walking · ${p.done} done`}</div></span><span class="chev">${ICONS.chev}</span></button>`;
     }).join('');
   } else {
     const d = DAYS.find((x) => x.id === ui.dayId);
@@ -191,14 +241,14 @@ function renderSheet(scrollToSel = true) {
     } else {
       const nextId = d.date === TODAY ? d.stops.find((s) => s.kind !== 'hub' && !statusOf(s.id))?.id : null;
       const meta = `<div class="day-meta">
-        ${statsHTML(dayDistances(d, ui.shared.status))}
+        ${statsHTML(dayDistances(d, ui.shared.status, ui.shared.routes))}
         <div class="row">${ICONS.clock}<span>${esc(d.start)}</span></div>
         ${d.end ? `<div class="row">${ICONS.flagEnd}<span>${esc(d.end)}</span></div>` : ''}
         ${d.tips?.length ? `<ul>${d.tips.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
         ${transitLinks()}
       </div>`;
-      const list = d.stops.map((s) => legHTML(s) + stopHTML(d, s, nextId)).join('');
-      body.innerHTML = meta + `<ul class="stops">${list}</ul>`;
+      const list = d.stops.map((s) => (s.added ? '' : legHTML(s)) + stopHTML(d, s, nextId)).join('');
+      body.innerHTML = meta + `<ul class="stops">${list}</ul><button class="add-stop" data-act="add" data-id="${d.id}">${ICONS.plus} Add a stop to this day</button>`;
     }
   }
   body.scrollTop = keepScroll;
@@ -279,6 +329,12 @@ $('#sheetBody').addEventListener('click', (e) => {
   else if (act === 'skip') { toggleStatus(id, 'skip'); }
   else if (act === 'day') { setDay(id, { sheet: 'half' }); }
   else if (act === 'note-del') { if (confirm('Delete this note?')) sync.deleteNote(id); }
+  else if (act === 'add') { ensureWho(() => openAdd({ day: id, after: lastStopId(id) })); }
+  else if (act === 'add-after') { const hit = STOP_BY_ID.get(id); ensureWho(() => openAdd({ day: hit.day.id, after: id })); }
+  else if (act === 'remove-added') {
+    const hit = STOP_BY_ID.get(id);
+    if (hit && confirm(`Remove “${hit.stop.name}” from the plan for everyone?`)) { sync.deleteStop(id); ui.sel = null; toast('Stop removed.'); }
+  }
 });
 $('#sheetBody').addEventListener('keydown', (e) => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.stop-main')) { e.preventDefault(); e.target.click(); }
@@ -370,7 +426,7 @@ window.addEventListener('resize', () => { layoutSheet(false); tripMap && tripMap
 
 // ---------- Panels ----------
 function openPanel(id) { $('#scrim').hidden = false; $(id).hidden = false; }
-function closePanels() { $('#scrim').hidden = true; $('#menu').hidden = true; $('#who').hidden = true; }
+function closePanels() { $('#scrim').hidden = true; $('#menu').hidden = true; $('#who').hidden = true; $('#add').hidden = true; }
 $('#scrim').addEventListener('click', () => { if (!$('#who').hidden && !ui.who) return; closePanels(); });
 
 let whoThen = null;
@@ -501,6 +557,150 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// ---------- Add a stop ----------
+function lastStopId(dayId) {
+  const d = DAYS.find((x) => x.id === dayId);
+  const real = d.stops.filter((s) => s.kind !== 'hub');
+  const last = real[real.length - 1];
+  return last ? last.id : null;
+}
+const draft = { day: null, after: null, name: '', at: null, q: null, t: '', cost: '', kind: 'sight', note: '', results: [], searching: false, searchMsg: '' };
+
+function openAdd({ day, after }) {
+  Object.assign(draft, { day, after, name: '', at: null, q: null, t: '', cost: '', kind: 'sight', note: '', results: [], searching: false, searchMsg: '' });
+  renderAdd();
+  openPanel('#add');
+  setTimeout(() => $('#addSearch')?.focus(), 150);
+}
+
+function renderAdd() {
+  const d = DAYS.find((x) => x.id === draft.day);
+  const options = [`<option value="">Start of the day</option>`]
+    .concat(d.stops.map((s) => `<option value="${s.id}" ${draft.after === s.id ? 'selected' : ''}>${esc((s.t ? s.t + ' · ' : '') + (s.added ? '+ ' : (s._n ? s._n + '. ' : '')) + s.name)}</option>`)).join('');
+  const results = draft.results.map((r, i) => `<button type="button" class="result" data-pick="${i}"><b>${esc(r.name)}</b><small>${esc(r.sub)}</small></button>`).join('');
+  $('#add').innerHTML = `
+    <button class="icon-btn close" data-add="close" aria-label="Close">${ICONS.close}</button>
+    <h2>Add a stop · ${d.dow} ${d.num}</h2>
+    <h3>Where</h3>
+    ${draft.at ? `<div class="card picked"><div class="row">${ICONS.pin}<div class="grow"><b>${esc(draft.name || 'Dropped pin')}</b><p class="small">${draft.q ? esc(draft.q) : 'Spot picked on the map'}</p></div><button type="button" class="btn" data-add="clear">Change</button></div></div>` : `
+    <form class="search" data-add-form="search">
+      <input id="addSearch" type="search" placeholder="Search a place, e.g. Joe's Pizza" value="${esc(draft.searchText || '')}" autocomplete="off" enterkeyhint="search">
+      <button class="btn primary" type="submit">Search</button>
+    </form>
+    ${draft.searching ? '<p class="small">Searching…</p>' : ''}
+    ${draft.searchMsg ? `<p class="small">${esc(draft.searchMsg)}</p>` : ''}
+    <div class="results">${results}</div>
+    <button type="button" class="btn wide" data-add="pick">${ICONS.pin} Pick the spot on the map</button>`}
+    <h3>Details</h3>
+    <form class="add-form" data-add-form="save">
+      <label>Name<input name="name" value="${esc(draft.name)}" required maxlength="80" placeholder="What is it?"></label>
+      <label>Comes after<select name="after">${options}</select></label>
+      <div class="two">
+        <label>Time<input name="t" value="${esc(draft.t)}" maxlength="12" placeholder="e.g. 2:30"></label>
+        <label>Cost<input name="cost" value="${esc(draft.cost)}" maxlength="16" placeholder="e.g. ~$10"></label>
+      </div>
+      <div class="seg" role="radiogroup" aria-label="Type">
+        <button type="button" data-kind="sight" class="${draft.kind === 'sight' ? 'on' : ''}">Sight / activity</button>
+        <button type="button" data-kind="food" class="${draft.kind === 'food' ? 'on' : ''}">Food / drink</button>
+      </div>
+      <label>Note<textarea name="note" rows="2" maxlength="300" placeholder="Optional">${esc(draft.note)}</textarea></label>
+      <button class="btn primary wide" type="submit" ${draft.at ? '' : 'disabled'}>Add to ${d.dow} ${d.num}</button>
+      ${draft.at ? '' : '<p class="small">Search for the place or pick it on the map first.</p>'}
+    </form>`;
+}
+
+function keepDraftFields() {
+  const f = $('#add .add-form');
+  if (!f) return;
+  draft.name = f.name.value; draft.after = f.after.value || null; draft.t = f.t.value; draft.cost = f.cost.value; draft.note = f.note.value;
+}
+
+$('#add').addEventListener('click', (e) => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick) {
+    keepDraftFields();
+    const r = draft.results[Number(pick.dataset.pick)];
+    Object.assign(draft, { at: r.at, name: draft.name || r.name, q: r.q, kind: r.food ? 'food' : draft.kind, results: [] });
+    renderAdd(); return;
+  }
+  const kind = e.target.closest('[data-kind]');
+  if (kind) { keepDraftFields(); draft.kind = kind.dataset.kind; renderAdd(); return; }
+  const b = e.target.closest('[data-add]');
+  if (!b) return;
+  if (b.dataset.add === 'close') closePanels();
+  else if (b.dataset.add === 'clear') { keepDraftFields(); draft.at = null; draft.q = null; renderAdd(); }
+  else if (b.dataset.add === 'pick') { keepDraftFields(); startPick(); }
+});
+
+$('#add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  if (form.dataset.addForm === 'search') {
+    keepDraftFields();
+    const text = form.querySelector('input').value.trim();
+    draft.searchText = text;
+    if (!text) return;
+    if (!navigator.onLine) { draft.searchMsg = 'Search needs data. Use “Pick the spot on the map” instead.'; renderAdd(); return; }
+    draft.searching = true; draft.searchMsg = ''; renderAdd();
+    try {
+      const d = DAYS.find((x) => x.id === draft.day);
+      const anchor = (draft.after && STOP_BY_ID.get(draft.after)?.stop.at) || d.stops.find((s) => s.at)?.at;
+      draft.results = await searchPlaces(text, anchor);
+      draft.searchMsg = draft.results.length ? '' : 'Nothing found. Try another name, or pick the spot on the map.';
+    } catch {
+      draft.searchMsg = 'Search didn’t work just now. Try again, or pick the spot on the map.';
+    }
+    draft.searching = false; renderAdd();
+    return;
+  }
+  keepDraftFields();
+  if (!draft.at || !draft.name.trim()) return;
+  const id = sync.addStop({
+    day: draft.day, after: draft.after || null, name: draft.name.trim(), lng: draft.at[0], lat: draft.at[1],
+    q: draft.q || null, t: draft.t.trim(), cost: draft.cost.trim(), kind: draft.kind, note: draft.note.trim(),
+  }, ui.who);
+  closePanels();
+  setDay(draft.day, { stop: id, sheet: 'half' });
+  toast(navigator.onLine ? 'Stop added for everyone.' : 'Stop added. It will sync and get its walking route when you have data.');
+});
+
+// Pick a spot: move the map under a fixed crosshair, then confirm.
+function pickCentre() {
+  const top = $('.top').getBoundingClientRect().bottom;
+  const sheetTop = isWide() ? window.innerHeight : $('#sheet').getBoundingClientRect().top;
+  const mapBox = $('#map').getBoundingClientRect();
+  return { x: (isWide() ? mapBox.left + mapBox.width / 2 : window.innerWidth / 2) - mapBox.left, y: (top + sheetTop) / 2 - mapBox.top, top: (top + sheetTop) / 2 };
+}
+function startPick() {
+  if (!tripMap || !ui.mapReady) { toast('The map isn’t ready yet.'); return; }
+  closePanels();
+  if (!isWide()) setSheet('peek', false);
+  const c = pickCentre();
+  const cross = $('#crosshair');
+  cross.style.top = c.top + 'px';
+  cross.style.left = (isWide() ? $('#map').getBoundingClientRect().left + c.x : window.innerWidth / 2) + 'px';
+  cross.hidden = false;
+  $('#pickBar').hidden = false;
+}
+function endPick() { $('#crosshair').hidden = true; $('#pickBar').hidden = true; setSheet('half', false); }
+$('#pickBar').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-pickbar]');
+  if (!b) return;
+  if (b.dataset.pickbar === 'cancel') { endPick(); openPanel('#add'); return; }
+  const c = pickCentre();
+  const at = tripMap.pointAt(c.x, c.y);
+  endPick();
+  Object.assign(draft, { at, q: null });
+  renderAdd(); openPanel('#add');
+  if (!draft.name && navigator.onLine) {
+    const place = await nameForSpot(at);
+    if (place && !draft.name && $('#add .add-form')) {
+      keepDraftFields();
+      if (!draft.name) { draft.name = place.name; draft.q = null; if (place.food) draft.kind = 'food'; renderAdd(); }
+    }
+  }
+});
+
 // ---------- Boot ----------
 $('#fitBtn').innerHTML = ICONS.fit;
 $('#fitBtn').addEventListener('click', () => tripMap && ui.mapReady && tripMap.fit());
@@ -515,6 +715,8 @@ function initialDay() {
 
 (async function boot() {
   await applyGeo(DAYS);
+  markOriginalOrder(DAYS);
+  applyAdded();
   const start = initialDay();
   ui.dayId = start.day; ui.sel = start.stop;
   renderTabs(); renderPill();
@@ -536,7 +738,7 @@ function initialDay() {
     await tripMap.init();
     ui.mapReady = true;
     layoutSheet(false);
-    tripMap.setStatus(ui.shared.status);
+    tripMap.update(ui.shared.status, ui.shared.routes, false);
     tripMap.showDay(ui.dayId);
     if (ui.sel) tripMap.select(ui.sel, true);
   } catch (e) {

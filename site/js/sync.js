@@ -1,5 +1,6 @@
-// Shared ticks and notes. Local-first: every change is saved on the phone straight away and
-// synced through Firebase Firestore whenever there is a connection.
+// Shared state: ticks/skips (status), notes, added stops and live-computed routes.
+// Local-first: every change is saved on the phone straight away and synced through Firebase Firestore
+// whenever there is a connection.
 import {
   initializeApp, getAuth, signInAnonymously, onAuthStateChanged,
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -15,6 +16,7 @@ const FIREBASE = {
   appId: '1:487931396673:web:1893784fe4ab4c521cbcc0',
 };
 
+const COLS = ['status', 'notes', 'added', 'routes'];
 const LS_STATE = 'sib.shared.v1';
 const LS_QUEUE = 'sib.queue.v1';
 
@@ -23,36 +25,40 @@ const ls = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage full or blocked */ } },
 };
 
+// Firestore can't store nested arrays, so route paths are stored flat.
+const flatten = (path) => path.flat();
+const unflatten = (flat) => { const out = []; for (let i = 0; i + 1 < (flat || []).length; i += 2) out.push([flat[i], flat[i + 1]]); return out; };
+
+function migrateOp(op) { // queue entries from the first version of the app
+  if (op.col) return op;
+  if (op.kind === 'status') return { col: 'status', id: op.id, data: op.data };
+  if (op.kind === 'note') return { col: 'notes', id: op.id, data: op.data };
+  if (op.kind === 'note-del') return { col: 'notes', id: op.id, del: true };
+  return null;
+}
+
 export function createSync(tripId, onChange) {
-  const saved = ls.get(LS_STATE, { status: {}, notes: {} });
-  const state = { status: saved.status || {}, notes: saved.notes || {} };
-  let queue = ls.get(LS_QUEUE, []);
+  const saved = ls.get(LS_STATE, {});
+  const state = Object.fromEntries(COLS.map((c) => [c, saved[c] || {}]));
+  let queue = ls.get(LS_QUEUE, []).map(migrateOp).filter(Boolean);
   let db = null;
   let ready = false;
-  let serverPending = false;
+  const pendingByCol = {};
   let lastServerSync = 0;
   let error = null;
 
   const persist = () => ls.set(LS_STATE, state);
   const emit = () => onChange(api.snapshot());
 
-  // Apply a change locally (optimistic), then send it if we can.
-  function apply(op) {
-    if (op.kind === 'status') {
-      if (op.data.s) state.status[op.id] = op.data; else delete state.status[op.id];
-    } else if (op.kind === 'note') {
-      state.notes[op.id] = op.data;
-    } else if (op.kind === 'note-del') {
-      delete state.notes[op.id];
-    }
-    persist();
+  const keep = (col, data) => !(col === 'status' && !data.s);
+  function applyTo(map, op) {
+    if (op.del || !keep(op.col, op.data)) delete map[op.id];
+    else map[op.id] = op.col === 'routes' ? { ...op.data, path: unflatten(op.data.flat) } : op.data;
   }
 
   async function send(op) {
-    const base = ['trips', tripId];
-    if (op.kind === 'status') await setDoc(doc(db, ...base, 'status', op.id), op.data);
-    else if (op.kind === 'note') await setDoc(doc(db, ...base, 'notes', op.id), op.data);
-    else if (op.kind === 'note-del') await deleteDoc(doc(db, ...base, 'notes', op.id));
+    const ref = doc(db, 'trips', tripId, op.col, op.id);
+    if (op.del) await deleteDoc(ref); else await setDoc(ref, op.data);
   }
 
   function flush() {
@@ -64,7 +70,8 @@ export function createSync(tripId, onChange) {
   }
 
   function enqueue(op) {
-    apply(op);
+    applyTo(state[op.col], op);
+    persist();
     queue.push(op); ls.set(LS_QUEUE, queue);
     flush();
     emit();
@@ -72,27 +79,21 @@ export function createSync(tripId, onChange) {
 
   function listen() {
     const opts = { includeMetadataChanges: true };
-    onSnapshot(collection(db, 'trips', tripId, 'status'), opts, (snap) => {
-      const next = {};
-      snap.forEach((d) => { const v = d.data(); if (v && v.s) next[d.id] = v; });
-      for (const op of queue) if (op.kind === 'status') { if (op.data.s) next[op.id] = op.data; else delete next[op.id]; }
-      state.status = next;
-      serverPending = snap.metadata.hasPendingWrites;
-      if (!snap.metadata.fromCache) lastServerSync = Date.now();
-      persist(); emit();
-    }, (e) => { error = e; emit(); });
-    onSnapshot(collection(db, 'trips', tripId, 'notes'), opts, (snap) => {
-      const next = {};
-      snap.forEach((d) => { next[d.id] = d.data(); });
-      for (const op of queue) {
-        if (op.kind === 'note') next[op.id] = op.data;
-        if (op.kind === 'note-del') delete next[op.id];
-      }
-      state.notes = next;
-      serverPending = serverPending || snap.metadata.hasPendingWrites;
-      if (!snap.metadata.fromCache) lastServerSync = Date.now();
-      persist(); emit();
-    }, (e) => { error = e; emit(); });
+    for (const col of COLS) {
+      onSnapshot(collection(db, 'trips', tripId, col), opts, (snap) => {
+        const next = {};
+        snap.forEach((d) => {
+          const v = d.data();
+          if (!v || !keep(col, v)) return;
+          next[d.id] = col === 'routes' ? { ...v, path: unflatten(v.flat) } : v;
+        });
+        for (const op of queue) if (op.col === col) applyTo(next, op);
+        state[col] = next;
+        pendingByCol[col] = snap.metadata.hasPendingWrites;
+        if (!snap.metadata.fromCache) lastServerSync = Date.now();
+        persist(); emit();
+      }, (e) => { error = e; emit(); });
+    }
   }
 
   function start() {
@@ -114,7 +115,7 @@ export function createSync(tripId, onChange) {
     }
   }
 
-  const id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   const api = {
     start,
@@ -122,22 +123,21 @@ export function createSync(tripId, onChange) {
       return {
         status: state.status,
         notes: state.notes,
+        added: state.added,
+        routes: state.routes,
         online: navigator.onLine,
         ready,
-        pending: queue.length > 0 || serverPending,
+        pending: queue.length > 0 || Object.values(pendingByCol).some(Boolean),
         lastServerSync,
         error,
       };
     },
-    setStatus(stopId, s, by) {
-      enqueue({ kind: 'status', id: stopId, data: s ? { s, by, at: Date.now() } : { s: '', by, at: Date.now() } });
-    },
-    addNote(stopId, text, by) {
-      enqueue({ kind: 'note', id: id(), data: { stop: stopId, text, by, at: Date.now() } });
-    },
-    deleteNote(noteId) {
-      enqueue({ kind: 'note-del', id: noteId });
-    },
+    setStatus(stopId, s, by) { enqueue({ col: 'status', id: stopId, data: { s: s || '', by, at: Date.now() } }); },
+    addNote(stopId, text, by) { enqueue({ col: 'notes', id: newId(), data: { stop: stopId, text, by, at: Date.now() } }); },
+    deleteNote(noteId) { enqueue({ col: 'notes', id: noteId, del: true }); },
+    addStop(data, by) { const id = 'x' + newId(); enqueue({ col: 'added', id, data: { ...data, by, created: Date.now() } }); return id; },
+    deleteStop(id) { enqueue({ col: 'added', id, del: true }); },
+    saveRoute(key, mode, path) { enqueue({ col: 'routes', id: key, data: { mode, flat: flatten(path), at: Date.now() } }); },
   };
   return api;
 }

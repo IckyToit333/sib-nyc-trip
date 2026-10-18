@@ -7,7 +7,7 @@ const RUNTIME = 'sib-runtime-' + BUILD;
 const CORE = [
   './', 'index.html', 'manifest.webmanifest',
   'css/app.css',
-  'js/app.js', 'js/data.js', 'js/sync.js', 'js/map.js', 'js/icons.js', 'js/geo.js', 'js/stats.js', 'js/routes.js',
+  'js/app.js', 'js/data.js', 'js/sync.js', 'js/map.js', 'js/icons.js', 'js/geo.js', 'js/stats.js', 'js/routes.js', 'js/live.js',
   'vendor/libs.js', 'vendor/maplibre-gl.css',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];

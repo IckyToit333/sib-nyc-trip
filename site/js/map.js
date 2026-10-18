@@ -87,7 +87,7 @@ export class TripMap {
     this.onStopTap = onStopTap; this.onDayTap = onDayTap;
     this.container = container;
     this.markers = new Map();
-    this.dayId = null; this.selId = null; this.status = {};
+    this.dayId = null; this.selId = null; this.status = {}; this.routes = {};
     this.padding = { top: 130, bottom: 200, left: 30, right: 30 };
     this.offline = false;
   }
@@ -119,17 +119,21 @@ export class TripMap {
     this.map.setStyle(makeStyle(src.url));
   }
 
-  addOverlays() {
-    const m = this.map;
-    if (m.getSource('legs')) return;
-    const legs = this.legFeatures(); const dots = [];
+  dotFeatures() {
+    const dots = [];
     for (const d of this.days) {
       for (const s of d.stops) {
         if (s.at && s.kind !== 'hub') dots.push({ type: 'Feature', properties: { day: d.id, stop: s.id, color: d.color }, geometry: { type: 'Point', coordinates: s.at } });
       }
     }
-    m.addSource('legs', { type: 'geojson', data: { type: 'FeatureCollection', features: legs } });
-    m.addSource('dots', { type: 'geojson', data: { type: 'FeatureCollection', features: dots } });
+    return { type: 'FeatureCollection', features: dots };
+  }
+
+  addOverlays() {
+    const m = this.map;
+    if (m.getSource('legs')) return;
+    m.addSource('legs', { type: 'geojson', data: { type: 'FeatureCollection', features: this.legFeatures() } });
+    m.addSource('dots', { type: 'geojson', data: this.dotFeatures() });
     m.addLayer({ id: 'legs-casing', type: 'line', source: 'legs', filter: ['!=', ['get', 'mode'], 'walk'], layout: { 'line-cap': 'round' }, paint: { 'line-color': '#fff', 'line-width': 6, 'line-opacity': 0.9 } });
     m.addLayer({ id: 'legs-transit', type: 'line', source: 'legs', filter: ['!=', ['get', 'mode'], 'walk'], layout: { 'line-cap': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3.5 } });
     m.addLayer({ id: 'legs-walk', type: 'line', source: 'legs', filter: ['==', ['get', 'mode'], 'walk'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.1, 2] } });
@@ -148,15 +152,18 @@ export class TripMap {
     new maplibregl.Marker({ element: home }).setLngLat(this.trip.home.at).addTo(this.map);
     const hotel = el(`<div class="pin-place hotel" title="${this.trip.hotel.name}">${ICONS.bed}</div>`);
     new maplibregl.Marker({ element: hotel }).setLngLat(this.trip.hotel.at).addTo(this.map);
+    this.buildStopMarkers();
+  }
 
+  buildStopMarkers() {
+    for (const [, m] of this.markers) if (m.shown) m.marker.remove();
+    this.markers.clear();
     for (const d of this.days) {
-      let n = 0;
       for (const s of d.stops) {
-        const isHub = s.kind === 'hub';
-        if (!isHub) n++;
-        s._n = isHub ? null : n;
         if (!s.at) continue;
-        const node = el(`<div class="pin ${s.kind || ''}" style="--c:${d.color}" role="button" aria-label="${s.name}">${isHub ? '' : n}</div>`);
+        const isHub = s.kind === 'hub';
+        const cls = ['pin', s.kind || '', s.added ? 'added' : ''].join(' ');
+        const node = el(`<div class="${cls}" style="--c:${d.color}" role="button" aria-label="${s.name.replace(/"/g, '&quot;')}">${isHub ? '' : (s._n ?? '')}</div>`);
         node.addEventListener('click', (e) => { e.stopPropagation(); this.onStopTap(d.id, s.id); });
         const marker = new maplibregl.Marker({ element: node, anchor: 'center' }).setLngLat(s.at);
         this.markers.set(s.id, { marker, node, day: d.id, stop: s, shown: false });
@@ -167,15 +174,25 @@ export class TripMap {
   legFeatures() {
     const out = [];
     for (const d of this.days) {
-      for (const l of effectiveLegs(d, this.status)) {
+      for (const l of effectiveLegs(d, this.status, this.routes)) {
         out.push({ type: 'Feature', properties: { day: d.id, color: d.color, mode: l.mode }, geometry: { type: 'LineString', coordinates: l.path } });
       }
     }
     return out;
   }
 
-  setStatus(status) {
-    this.status = status;
+  // status: ticks/skips, routes: shared live routes, stopsChanged: stops were added or removed
+  update(status, routes, stopsChanged = false) {
+    this.status = status; this.routes = routes;
+    if (stopsChanged) {
+      this.buildStopMarkers();
+      const dots = this.map && this.map.getSource && this.map.getSource('dots');
+      if (dots) dots.setData(this.dotFeatures());
+      if (this.dayId) {
+        for (const [, m] of this.markers) if (m.day === this.dayId) { m.marker.addTo(this.map); m.shown = true; }
+      }
+      if (this.selId && this.markers.get(this.selId)) this.markers.get(this.selId).node.classList.add('sel');
+    }
     const src = this.map && this.map.getSource && this.map.getSource('legs');
     if (src) src.setData({ type: 'FeatureCollection', features: this.legFeatures() });
     for (const [id, m] of this.markers) {
@@ -185,6 +202,9 @@ export class TripMap {
       if (m.stop.kind !== 'hub') m.node.innerHTML = st === 'done' ? ICONS.tick : (m.stop._n ?? '');
     }
   }
+
+  // Map point under a screen position inside the map container
+  pointAt(x, y) { const ll = this.map.unproject([x, y]); return [Math.round(ll.lng * 1e6) / 1e6, Math.round(ll.lat * 1e6) / 1e6]; }
 
   setPadding(p) { this.padding = { ...this.padding, ...p }; }
 

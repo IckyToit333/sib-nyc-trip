@@ -25,5 +25,7 @@ export const ICONS = {
   chev: s('<path d="m9 6 6 6-6 6"/>', 18),
   skip: s('<path d="M6 6l12 12M18 6 6 18"/>', 14, 'stroke-width="2.6"'),
   trash: s('<path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>', 15),
+  plus: s('<path d="M12 5v14M5 12h14"/>', 15, 'stroke-width="2.6"'),
+  pin: s('<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/>', 18),
   sync: s('<path d="M20 12a8 8 0 0 1-14 5.3M4 12A8 8 0 0 1 18 6.7"/><path d="M18 3v4h-4M6 21v-4h4"/>', 18),
 };
