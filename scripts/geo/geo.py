@@ -258,7 +258,7 @@ def subway_path(a, b, lines, subway_lines, stations):
         return None
     sa = min(hubs, key=lambda h: dist(h[1]['at'], a))
     sb = min(hubs, key=lambda h: dist(h[1]['at'], b))
-    if dist(sa[1]['at'], a) > 600 or dist(sb[1]['at'], b) > 600 or sa[0] == sb[0]:
+    if dist(sa[1]['at'], a) > 900 or dist(sb[1]['at'], b) > 900 or sa[0] == sb[0]:
         return None
     nodes, length = g.path(sa[0], sb[0])
     if not nodes or length > 3.5 * dist(a, b) + 1500:
